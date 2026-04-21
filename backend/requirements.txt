@@ -1,0 +1,11 @@
+crewai
+anthropic
+python-dotenv
+fastapi
+uvicorn
+e2b-code-interpreter
+pytest
+pytest-cov
+bandit
+jinja2
+requests
