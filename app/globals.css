@@ -1,0 +1,251 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* AutonomousDev Light Theme */
+  --background: #F5F4F0;
+  --foreground: #1C1917;
+  --card: #FFFFFF;
+  --card-foreground: #1C1917;
+  --popover: #FFFFFF;
+  --popover-foreground: #1C1917;
+  --primary: #6D28D9;
+  --primary-foreground: #FFFFFF;
+  --secondary: #0D9488;
+  --secondary-foreground: #FFFFFF;
+  --muted: #F9F8F6;
+  --muted-foreground: #57534E;
+  --accent: #6D28D9;
+  --accent-foreground: #FFFFFF;
+  --destructive: #DC2626;
+  --destructive-foreground: #FFFFFF;
+  --border: #E4E2DC;
+  --border-hover: #C9C7BF;
+  --input: #F9F8F6;
+  --ring: #6D28D9;
+  --radius: 0.625rem;
+  
+  /* Purple palette */
+  --purple-primary: #6D28D9;
+  --purple-light: #EDE9FE;
+  --purple-mid: #7C3AED;
+  --purple-text: #4C1D95;
+  --purple-border: #DDD6FE;
+  
+  /* Teal palette */
+  --teal-primary: #0D9488;
+  --teal-light: #CCFBF1;
+  --teal-text: #134E4A;
+  --teal-border: #99F6E4;
+  
+  /* Red palette */
+  --red-primary: #DC2626;
+  --red-light: #FEE2E2;
+  --red-text: #7F1D1D;
+  --red-border: #FECACA;
+  
+  /* Success palette */
+  --success-primary: #059669;
+  --success-light: #D1FAE5;
+  --success-text: #064E3B;
+  
+  /* Warning palette */
+  --warning-primary: #D97706;
+  --warning-light: #FEF3C7;
+  --warning-text: #78350F;
+  
+  /* Text colors */
+  --text-primary: #1C1917;
+  --text-secondary: #57534E;
+  --text-muted: #A8A29E;
+  --text-hint: #D6D3D1;
+  
+  /* Surface colors */
+  --surface-page: #F5F4F0;
+  --surface-card: #FFFFFF;
+  --surface-subtle: #F9F8F6;
+  
+  /* Code block (dark) */
+  --code-bg: #1E1B2E;
+  --code-text: #E2E8F0;
+  --code-keyword: #C084FC;
+  --code-string: #86EFAC;
+  --code-comment: #64748B;
+  --code-number: #FCA5A5;
+  --code-function: #93C5FD;
+  --code-line-number: #4A4268;
+  --code-border: #2D2A45;
+  --code-scrollbar: #3D3654;
+}
+
+@theme inline {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply bg-[#F5F4F0];
+  }
+  body {
+    @apply bg-[#F5F4F0] text-[#1C1917];
+  }
+}
+
+/* Custom light scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #E4E2DC;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #C9C7BF;
+}
+
+/* Dark scrollbar for code blocks */
+.dark-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dark-scrollbar::-webkit-scrollbar-thumb {
+  background: #3D3654;
+  border-radius: 3px;
+}
+
+.dark-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #4A4268;
+}
+
+/* Pulse animation for active states */
+@keyframes pulse-dot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.1);
+  }
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+/* Pulse ring animation for active step */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+.animate-pulse-ring::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: rgba(109, 40, 217, 0.3);
+  animation: pulse-ring 1.5s ease-out infinite;
+}
+
+/* Shimmer animation for skeletons */
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, #F5F4F0 25%, #ECEAE4 50%, #F5F4F0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Line fill animation */
+@keyframes line-fill {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+.animate-line-fill {
+  animation: line-fill 1s ease-out forwards;
+}
+
+/* Count up animation */
+@keyframes count-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-count-up {
+  animation: count-up 0.6s ease-out forwards;
+}
+
+/* Focus ring style */
+.focus-ring {
+  box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.15);
+}
+
+/* Card shadows */
+.shadow-card {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.shadow-card-hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.10), 0 2px 4px rgba(0, 0, 0, 0.06);
+}
