@@ -1,225 +1,102 @@
-# test_suite.py
 import pytest
 import sqlite3
-from typing import Tuple, Optional
-import sys
-import os
-import json
-import traceback
+from typing import Dict
+from your_module import create_connection, validate_credentials, login_endpoint
 
-# region agent log
-DEBUG_LOG_PATH = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "debug-5d5ed2.log")
-)
+@pytest.fixture
+def test_database_name():
+    return "test.db"
 
+@pytest.fixture
+def test_username():
+    return "test_user"
 
-def _agent_log(hypothesis_id: str, message: str, data: dict) -> None:
-    payload = {
-        "sessionId": "5d5ed2",
-        "runId": "pre-fix",
-        "hypothesisId": hypothesis_id,
-        "location": "output/test_suite.py",
-        "message": message,
-        "data": data,
-        "timestamp": int(__import__("time").time() * 1000),
-    }
-    with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as log_file:
-        log_file.write(json.dumps(payload) + "\n")
+@pytest.fixture
+def test_password():
+    return "test_password"
 
+def test_create_connection(test_database_name):
+    """Test creating a connection to the SQLite database."""
+    connection = create_connection(test_database_name)
+    assert isinstance(connection, sqlite3.Connection)
+    connection.close()
 
-_agent_log(
-    "H1",
-    "pytest module import start",
-    {"cwd": os.getcwd(), "output_dir_exists": os.path.isdir("output")},
-)
-# endregion
-
-sys.path.insert(0, os.path.abspath('output'))
-_agent_log(
-    "H2",
-    "sys.path configured",
-    {"sys_path_0": sys.path[0], "generated_code_path": os.path.abspath("output/generated_code.py")},
-)
-try:
-    from generated_code import create_connection, validate_credentials, handle_login
-    _agent_log(
-        "H3",
-        "generated_code import success",
-        {
-            "create_connection_callable": callable(create_connection),
-            "validate_credentials_callable": callable(validate_credentials),
-            "handle_login_callable": callable(handle_login),
-        },
-    )
-except Exception as error:  # pylint: disable=broad-except
-    _agent_log(
-        "H4",
-        "generated_code import failed",
-        {"error_type": type(error).__name__, "error": str(error), "traceback": traceback.format_exc()},
-    )
-    raise
-
-def test_create_connection_happy_path(tmp_path) -> None:
-    """Test create_connection with a happy path scenario."""
-    # Create a temporary database file
-    db_file = tmp_path / "test.db"
-    
-    # Create a connection to the database
-    conn = create_connection(str(db_file))
-    
-    # Check if the connection was established successfully
-    assert conn is not None
-    
-    # Close the connection to the database
-    conn.close()
-
-def test_create_connection_null_input() -> None:
-    """Test create_connection with a null input."""
-    # Check if the function returns None for a null input
-    assert create_connection(None) is None
-
-def test_create_connection_empty_string() -> None:
-    """Test create_connection with an empty string."""
-    # Check if the function returns None for an empty string
-    assert create_connection("") is None
-
-def test_create_connection_type_error() -> None:
-    """Test create_connection with a type error."""
-    # Check if the function raises a TypeError for a non-string input
+def test_create_connection_null_input():
+    """Test creating a connection with a null input."""
     with pytest.raises(TypeError):
-        create_connection(123)  # type: ignore
+        create_connection(None)
 
-def test_validate_credentials_happy_path(tmp_path) -> None:
-    """Test validate_credentials with a happy path scenario."""
-    # Create a temporary database file
-    db_file = tmp_path / "test.db"
-    
-    # Create a connection to the database
-    conn = create_connection(str(db_file))
-    
-    # Create a cursor object to execute SQL queries
-    cur = conn.cursor()
-    
-    # Create the users table
-    cur.execute("CREATE TABLE IF NOT EXISTS users (username TEXT, password TEXT)")
-    
-    # Insert a test user into the database
-    cur.execute("INSERT INTO users VALUES ('test_username', 'test_password')")
-    
-    # Commit the changes
-    conn.commit()
-    
-    # Validate the test user's credentials
-    result = validate_credentials(conn, "test_username", "test_password")
-    
-    # Check if the credentials are valid
-    assert result is True
-    
-    # Close the connection to the database
-    conn.close()
+def test_create_connection_empty_string():
+    """Test creating a connection with an empty string."""
+    with pytest.raises(sqlite3.OperationalError):
+        create_connection("")
 
-def test_validate_credentials_null_input() -> None:
-    """Test validate_credentials with null inputs."""
-    # Create a connection to the database
-    conn = create_connection(":memory:")
+def test_validate_credentials(test_database_name, test_username, test_password):
+    """Test validating user credentials."""
+    connection = create_connection(test_database_name)
+    cursor = connection.cursor()
+    cursor.execute("CREATE TABLE IF NOT EXISTS users (username TEXT, password TEXT)")
+    cursor.execute("INSERT OR IGNORE INTO users VALUES (?, ?)", (test_username, test_password))
+    connection.commit()
     
-    # Check if the function returns False for null inputs
-    assert validate_credentials(conn, None, None) is False
+    is_valid = validate_credentials(connection, test_username, test_password)
+    assert is_valid
     
-    # Close the connection to the database
-    conn.close()
+    connection.close()
 
-def test_validate_credentials_empty_string() -> None:
-    """Test validate_credentials with empty strings."""
-    # Create a connection to the database
-    conn = create_connection(":memory:")
-    
-    # Check if the function returns False for empty strings
-    assert validate_credentials(conn, "", "") is False
-    
-    # Close the connection to the database
-    conn.close()
-
-def test_validate_credentials_type_error() -> None:
-    """Test validate_credentials with type errors."""
-    # Create a connection to the database
-    conn = create_connection(":memory:")
-    
-    # Check if the function raises a TypeError for non-string inputs
+def test_validate_credentials_null_input(test_database_name):
+    """Test validating user credentials with a null input."""
+    connection = create_connection(test_database_name)
     with pytest.raises(TypeError):
-        validate_credentials(conn, 123, 456)  # type: ignore
-    
-    # Close the connection to the database
-    conn.close()
+        validate_credentials(connection, None, "password")
+    connection.close()
 
-def test_handle_login_happy_path(tmp_path) -> None:
-    """Test handle_login with a happy path scenario."""
-    # Create a temporary database file
-    db_file = tmp_path / "test.db"
-    
-    # Create a connection to the database
-    conn = create_connection(str(db_file))
-    
-    # Create a cursor object to execute SQL queries
-    cur = conn.cursor()
-    
-    # Create the users table
-    cur.execute("CREATE TABLE IF NOT EXISTS users (username TEXT, password TEXT)")
-    
-    # Insert a test user into the database
-    cur.execute("INSERT INTO users VALUES ('test_username', 'test_password')")
-    
-    # Commit the changes
-    conn.commit()
-    
-    # Handle the login endpoint with the test user's credentials
-    result, message = handle_login(conn, "test_username", "test_password")
-    
-    # Check if the login was successful
-    assert result is True
-    assert message == "Login successful"
-    
-    # Close the connection to the database
-    conn.close()
+def test_validate_credentials_empty_string(test_database_name):
+    """Test validating user credentials with an empty string."""
+    connection = create_connection(test_database_name)
+    is_valid = validate_credentials(connection, "", "")
+    assert not is_valid
+    connection.close()
 
-def test_handle_login_null_input() -> None:
-    """Test handle_login with null inputs."""
-    # Create a connection to the database
-    conn = create_connection(":memory:")
-    
-    # Check if the function returns a failure message for null inputs
-    result, message = handle_login(conn, None, None)
-    
-    # Check if the login was unsuccessful
-    assert result is False
-    assert message == "Invalid username or password"
-    
-    # Close the connection to the database
-    conn.close()
+def test_login_endpoint(test_database_name, test_username, test_password):
+    """Test handling the login endpoint."""
+    result = login_endpoint(test_username, test_password, test_database_name)
+    assert isinstance(result, Dict)
+    assert 'success' in result
+    assert result['success']
 
-def test_handle_login_empty_string() -> None:
-    """Test handle_login with empty strings."""
-    # Create a connection to the database
-    conn = create_connection(":memory:")
-    
-    # Check if the function returns a failure message for empty strings
-    result, message = handle_login(conn, "", "")
-    
-    # Check if the login was unsuccessful
-    assert result is False
-    assert message == "Invalid username or password"
-    
-    # Close the connection to the database
-    conn.close()
-
-def test_handle_login_type_error() -> None:
-    """Test handle_login with type errors."""
-    # Create a connection to the database
-    conn = create_connection(":memory:")
-    
-    # Check if the function raises a TypeError for non-string inputs
+def test_login_endpoint_null_input():
+    """Test handling the login endpoint with a null input."""
     with pytest.raises(TypeError):
-        handle_login(conn, 123, 456)  # type: ignore
+        login_endpoint(None, "password", "database_name")
+
+def test_login_endpoint_empty_string():
+    """Test handling the login endpoint with an empty string."""
+    result = login_endpoint("", "", "database_name")
+    assert not result['success']
+
+def test_login_endpoint_non_string_input():
+    """Test handling the login endpoint with a non-string input."""
+    with pytest.raises(TypeError):
+        login_endpoint(123, "password", "database_name")
+
+def test_login_endpoint_sql_injection(test_database_name, test_username, test_password):
+    """Test handling the login endpoint with a SQL injection attack."""
+    connection = create_connection(test_database_name)
+    cursor = connection.cursor()
+    cursor.execute("CREATE TABLE IF NOT EXISTS users (username TEXT, password TEXT)")
+    cursor.execute("INSERT OR IGNORE INTO users VALUES (?, ?)", (test_username, test_password))
+    connection.commit()
     
-    # Close the connection to the database
-    conn.close()
+    result = login_endpoint(test_username + "' OR 1=1 --", test_password, test_database_name)
+    assert not result['success']
+
+def test_login_endpoint_database_not_found():
+    """Test handling the login endpoint with a non-existent database."""
+    with pytest.raises(sqlite3.OperationalError):
+        login_endpoint("username", "password", "non_existent_database.db")
+
+def test_login_endpoint_database_permission_denied():
+    """Test handling the login endpoint with a database that has permission denied."""
+    with pytest.raises(sqlite3.OperationalError):
+        login_endpoint("username", "password", "/root/database.db")

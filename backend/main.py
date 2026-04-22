@@ -1,119 +1,107 @@
-"""Run the AutonomousDev Writer Agent pipeline end-to-end."""
+"""
+Entry point for the Agentic AI multi-agent coding crew.
+
+Agents
+------
+writer  → writes Python code from a task spec
+tester  → writes a pytest suite for the writer's code
+
+Run
+---
+    python main.py
+"""
 
 from __future__ import annotations
 
-import ast
 import logging
-import os
-from dataclasses import asdict, dataclass
-from typing import Any
+import sys
 
-from crewai import Crew, Process
+from crewai import Crew, Process, Task
 
 from agents.writer import writer
-from tasks.write_code_task import write_code_task
-from tools.sandbox_tool import sandbox_tool
+from agents.tester import tester
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+)
 LOGGER = logging.getLogger(__name__)
-OUTPUT_DIRECTORY = os.path.join(os.path.dirname(__file__), "output")
-OUTPUT_FILE_NAME = "generated_code.py"
-OUTPUT_FILE_PATH = os.path.join(OUTPUT_DIRECTORY, OUTPUT_FILE_NAME)
-STATUS_SUCCESS = "success"
-STATUS_ERROR = "error"
 
 
-@dataclass
-class PipelineResult:
-    """Structured result returned by the Writer Agent pipeline."""
+# ── Task specification ────────────────────────────────────────────────────────
+# Change this string to any coding problem you want the crew to solve.
+TASK_SPECIFICATION = """
+Write a Python module called `calculator.py` that implements the following functions:
+- add(a, b)        → returns a + b
+- subtract(a, b)   → returns a - b
+- multiply(a, b)   → returns a * b
+- divide(a, b)     → returns a / b, raises ZeroDivisionError if b == 0
 
-    code: str
-    sandbox_status: str
-    execution_error: str
-    file_path: str
+All inputs should accept int or float. Add full type hints and docstrings.
+"""
 
 
-writer_crew = Crew(
-    agents=[writer],
-    tasks=[write_code_task],
-    process=Process.sequential,
-    verbose=True,
+# ── Task 1: Write the code ────────────────────────────────────────────────────
+write_code_task = Task(
+    description=(
+        "You are given the following task specification:\n\n"
+        f"{TASK_SPECIFICATION}\n\n"
+        "Produce the complete Python source code. "
+        "Return ONLY the code inside a fenced ```python block."
+    ),
+    expected_output=(
+        "A single fenced ```python code block containing the complete, "
+        "executable Python module described in the specification."
+    ),
+    agent=writer,
 )
 
-# Placeholder: Tester Agent will be added here later.
-# Placeholder: Red Team Agent will be added here later.
+# ── Task 2: Write the tests ───────────────────────────────────────────────────
+# KEY FIX: `context=[write_code_task]` passes the writer's output to the tester.
+# Without this line the tester agent either never runs or has no code to test.
+write_tests_task = Task(
+    description=(
+        "You will receive Python source code written by the writer agent (in context). "
+        "Write a complete pytest suite that covers:\n"
+        "  • Happy-path behaviour for every public function\n"
+        "  • Edge cases: None inputs, empty strings, zero, negative numbers\n"
+        "  • Boundary values\n"
+        "  • Expected exceptions (use pytest.raises)\n\n"
+        "Return ONLY the test code inside a fenced ```python block. "
+        "The file should be named `test_solution.py`."
+    ),
+    expected_output=(
+        "A single fenced ```python code block containing a complete pytest suite "
+        "that can be run with `pytest test_solution.py` against the writer's code."
+    ),
+    agent=tester,
+    context=[write_code_task],   # ← THIS IS THE FIX
+)
 
 
-def _extract_generated_code(result: Any) -> str:
-    """Extract generated code text from CrewAI kickoff output."""
-    if isinstance(result, str):
-        return result
-    if hasattr(result, "raw") and isinstance(result.raw, str):
-        return result.raw
-    if hasattr(result, "output") and isinstance(result.output, str):
-        return result.output
-    return str(result)
-
-
-def _save_generated_code(code: str) -> str:
-    """Persist generated code to the configured output file path."""
-    os.makedirs(OUTPUT_DIRECTORY, exist_ok=True)
-    with open(OUTPUT_FILE_PATH, "w", encoding="utf-8") as output_file:
-        output_file.write(code)
-    return OUTPUT_FILE_PATH
-
-
-def run_pipeline(ticket: str) -> PipelineResult:
-    """Execute the Writer Agent pipeline for a single ticket."""
-    try:
-        crew_result = writer_crew.kickoff(inputs={"ticket": ticket})
-    except Exception as error:  # pylint: disable=broad-except
-        LOGGER.exception("Crew kickoff failed.")
-        raise RuntimeError(f"Writer crew execution failed: {error}") from error
-
-    code = _extract_generated_code(crew_result)
-    try:
-        ast.parse(code)
-    except SyntaxError as error:
-        return PipelineResult(
-            code=code,
-            sandbox_status=STATUS_ERROR,
-            execution_error=f"Syntax validation failed: {error}",
-            file_path="",
-        )
-
-    sandbox_result = sandbox_tool(code)
-    saved_path = _save_generated_code(code)
-    return PipelineResult(
-        code=code,
-        sandbox_status=sandbox_result.get("status", STATUS_ERROR),
-        execution_error=sandbox_result.get("error", ""),
-        file_path=saved_path,
-    )
+# ── Assemble the crew ─────────────────────────────────────────────────────────
+crew = Crew(
+    agents=[writer, tester],
+    tasks=[write_code_task, write_tests_task],  # order matters for sequential
+    process=Process.sequential,                 # writer finishes → tester starts
+    verbose=True,                               # shows agent banners in terminal
+)
 
 
 def main() -> None:
-    """Run a local smoke test for the Writer Agent pipeline."""
-    ticket = (
-        "Python program to add two numbers."
-    )
+    """Kick off the crew and print both outputs."""
+    LOGGER.info("Starting multi-agent coding crew…")
     try:
-        result = run_pipeline(ticket)
-        print(asdict(result))
-    except Exception as error:  # pylint: disable=broad-except
-        print(f"Pipeline failed cleanly: {error}")
+        result = crew.kickoff()
+    except Exception as exc:  # pylint: disable=broad-except
+        LOGGER.exception("Crew failed with an unexpected error.")
+        sys.exit(1)
+
+    print("\n" + "=" * 60)
+    print("CREW FINISHED — FINAL OUTPUT")
+    print("=" * 60)
+    print(result)
 
 
 if __name__ == "__main__":
     main()
-
-
-def test_full_pipeline() -> None:
-    """Run the full Writer + Tester pipeline with a realistic login ticket."""
-    from pipeline.crew import run_pipeline as run_full_pipeline
-
-    ticket = (
-        "Build a login endpoint that validates username and password against a "
-        "SQLite database."
-    )
-    result = run_full_pipeline(ticket)
-    print(result)

@@ -1,124 +1,89 @@
 # Import required libraries
 import sqlite3
-from typing import Tuple, Optional
-from sqlite3 import Error
+from typing import Dict
 
 # Define a function to create a connection to the SQLite database
-def create_connection(db_file: str) -> Optional[sqlite3.Connection]:
+def create_connection(database_name: str) -> sqlite3.Connection:
     """
     Create a connection to the SQLite database.
 
     Args:
-    db_file (str): The path to the SQLite database file.
+    database_name (str): The name of the SQLite database file.
 
     Returns:
-    Optional[sqlite3.Connection]: The connection object or None if the connection fails.
+    sqlite3.Connection: A connection to the SQLite database.
     """
-    if db_file is None:
-        return None
-    if not isinstance(db_file, str):
-        raise TypeError("db_file must be a string path")
-    if db_file.strip() == "":
-        return None
+    # Connect to the SQLite database
+    connection = sqlite3.connect(database_name)
+    return connection
 
-    try:
-        # Attempt to establish a connection to the SQLite database
-        conn = sqlite3.connect(db_file)
-        return conn
-    except Error as e:
-        # Handle any errors that occur during connection establishment
-        print(f"Error occurred while creating connection: {e}")
-        return None
-
-
-# Define a function to validate the username and password against the database
-def validate_credentials(conn: sqlite3.Connection, username: str, password: str) -> bool:
+# Define a function to validate user credentials
+def validate_credentials(connection: sqlite3.Connection, username: str, password: str) -> bool:
     """
-    Validate the username and password against the database.
+    Validate user credentials against the SQLite database.
 
     Args:
-    conn (sqlite3.Connection): The connection object to the SQLite database.
+    connection (sqlite3.Connection): A connection to the SQLite database.
     username (str): The username to validate.
     password (str): The password to validate.
 
     Returns:
     bool: True if the credentials are valid, False otherwise.
     """
-    if username is None or password is None:
+    # Create a cursor object to execute SQL queries
+    cursor = connection.cursor()
+    
+    # Query the database for the username and password
+    # Assuming a table named 'users' with columns 'username' and 'password'
+    cursor.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username, password))
+    
+    # Fetch the query result
+    result = cursor.fetchone()
+    
+    # If a result is found, the credentials are valid
+    if result:
+        return True
+    else:
         return False
-    if not isinstance(username, str) or not isinstance(password, str):
-        raise TypeError("username and password must be strings")
-    if username == "" or password == "":
-        return False
-
-    try:
-        # Create a cursor object to execute SQL queries
-        cur = conn.cursor()
-        
-        # Query the users table to check if the username and password match
-        cur.execute("SELECT * FROM users WHERE username=? AND password=?", (username, password))
-        
-        # Fetch the result of the query
-        result = cur.fetchone()
-        
-        # If a result is found, the credentials are valid
-        if result:
-            return True
-        else:
-            return False
-    except Error as e:
-        # Handle any errors that occur during query execution
-        print(f"Error occurred while validating credentials: {e}")
-        return False
-
 
 # Define a function to handle the login endpoint
-def handle_login(conn: sqlite3.Connection, username: str, password: str) -> Tuple[bool, str]:
+def login_endpoint(username: str, password: str, database_name: str) -> Dict[str, bool]:
     """
-    Handle the login endpoint by validating the username and password.
+    Handle the login endpoint by validating user credentials.
 
     Args:
-    conn (sqlite3.Connection): The connection object to the SQLite database.
     username (str): The username to validate.
     password (str): The password to validate.
+    database_name (str): The name of the SQLite database file.
 
     Returns:
-    Tuple[bool, str]: A tuple containing a boolean indicating whether the login was successful and a message.
+    Dict[str, bool]: A dictionary with a single key 'success' and a boolean value indicating whether the login was successful.
     """
-    if username is None or password is None:
-        return False, "Invalid username or password"
-    if not isinstance(username, str) or not isinstance(password, str):
-        raise TypeError("username and password must be strings")
-    if username == "" or password == "":
-        return False, "Invalid username or password"
-
-    # Validate the username and password
-    if validate_credentials(conn, username, password):
-        # If the credentials are valid, return a success message
-        return True, "Login successful"
-    else:
-        # If the credentials are invalid, return an error message
-        return False, "Invalid username or password"
-
-
-# Define a main function to demonstrate the usage of the login endpoint
-def main():
-    # Create a connection to the SQLite database
-    conn = create_connection("users.db")
+    # Create a connection to the database
+    connection = create_connection(database_name)
     
-    # Check if the connection was established successfully
-    if conn:
-        # Handle the login endpoint with example credentials
-        login_result, message = handle_login(conn, "example_username", "example_password")
-        
-        # Print the result of the login attempt
-        print(f"Login result: {login_result}, Message: {message}")
-        
-        # Close the connection to the database
-        conn.close()
-    else:
-        print("Failed to establish connection to the database")
+    # Validate the user credentials
+    is_valid = validate_credentials(connection, username, password)
+    
+    # Close the database connection
+    connection.close()
+    
+    # Return the result as a dictionary
+    return {'success': is_valid}
 
-
+# Example usage
 if __name__ == "__main__":
-    main()
+    database_name = "example.db"
+    username = "example_user"
+    password = "example_password"
+    
+    # Create a table in the database for demonstration purposes
+    connection = create_connection(database_name)
+    cursor = connection.cursor()
+    cursor.execute("CREATE TABLE IF NOT EXISTS users (username TEXT, password TEXT)")
+    cursor.execute("INSERT OR IGNORE INTO users VALUES (?, ?)", (username, password))
+    connection.commit()
+    connection.close()
+    
+    result = login_endpoint(username, password, database_name)
+    print(result)
