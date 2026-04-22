@@ -15,7 +15,7 @@ from tasks.write_code_task import write_code_task
 from tools.sandbox_tool import sandbox_tool
 
 LOGGER = logging.getLogger(__name__)
-OUTPUT_DIRECTORY = os.path.join(os.sep, "output")
+OUTPUT_DIRECTORY = os.path.join(os.path.dirname(__file__), "output")
 OUTPUT_FILE_NAME = "generated_code.py"
 OUTPUT_FILE_PATH = os.path.join(OUTPUT_DIRECTORY, OUTPUT_FILE_NAME)
 STATUS_SUCCESS = "success"
@@ -94,8 +94,7 @@ def run_pipeline(ticket: str) -> PipelineResult:
 def main() -> None:
     """Run a local smoke test for the Writer Agent pipeline."""
     ticket = (
-        "Build a Python function that takes a list of integers and returns the top 3 "
-        "largest values without using the sort() method."
+        "Python program to add two numbers."
     )
     try:
         result = run_pipeline(ticket)
@@ -106,3 +105,15 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+def test_full_pipeline() -> None:
+    """Run the full Writer + Tester pipeline with a realistic login ticket."""
+    from pipeline.crew import run_pipeline as run_full_pipeline
+
+    ticket = (
+        "Build a login endpoint that validates username and password against a "
+        "SQLite database."
+    )
+    result = run_full_pipeline(ticket)
+    print(result)

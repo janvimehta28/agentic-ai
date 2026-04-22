@@ -8,7 +8,7 @@ from crewai import Task
 
 from agents.writer import writer
 
-OUTPUT_DIRECTORY = os.path.join(os.sep, "output")
+OUTPUT_DIRECTORY = os.path.join(os.path.dirname(__file__), "output")
 OUTPUT_FILE_NAME = "generated_code.py"
 OUTPUT_FILE_PATH = os.path.join(OUTPUT_DIRECTORY, OUTPUT_FILE_NAME)
 TASK_DESCRIPTION = (
@@ -23,6 +23,12 @@ TASK_DESCRIPTION = (
     "- Handle edge cases explicitly.\n"
     "- Keep functions modular and easy to unit test.\n"
     "- Return only valid Python code."
+    """
+        IMPORTANT: Match the complexity of your output to the 
+        complexity of the ticket. A simple task needs simple code. 
+        Do not over-engineer. Do not add unnecessary abstractions, 
+        logging, or error handling that the ticket did not ask for..
+"""
 )
 EXPECTED_OUTPUT = (
     "A complete, executable Python file saved to /output/generated_code.py with proper "
