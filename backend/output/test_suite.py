@@ -1,102 +1,146 @@
+# Import required libraries
 import pytest
-import sqlite3
-from typing import Dict
-from your_module import create_connection, validate_credentials, login_endpoint
+from typing import Dict, Optional
+from fastapi import FastAPI, HTTPException
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from pydantic import BaseModel
+import jwt
+from datetime import datetime, timedelta
+from your_module import get_user, verify_password, generate_jwt_token, UserCredentials, User  # noqa: E402
 
-@pytest.fixture
-def test_database_name():
-    return "test.db"
+# Define test cases for the get_user function
+def test_get_user_found():
+    """
+    Verifies that the get_user function returns a user when found.
+    """
+    # Arrange
+    username = "user1"
+    # Act
+    user = get_user(username)
+    # Assert
+    assert user is not None
+    assert user.username == username
 
-@pytest.fixture
-def test_username():
-    return "test_user"
+def test_get_user_not_found():
+    """
+    Verifies that the get_user function returns None when not found.
+    """
+    # Arrange
+    username = "nonexistent"
+    # Act
+    user = get_user(username)
+    # Assert
+    assert user is None
 
-@pytest.fixture
-def test_password():
-    return "test_password"
+def test_get_user_none_input():
+    """
+    Verifies that the get_user function handles None input.
+    """
+    # Arrange
+    username = None
+    # Act and Assert
+    with pytest.raises(AttributeError):
+        get_user(username)
 
-def test_create_connection(test_database_name):
-    """Test creating a connection to the SQLite database."""
-    connection = create_connection(test_database_name)
-    assert isinstance(connection, sqlite3.Connection)
-    connection.close()
+# Define test cases for the verify_password function
+def test_verify_password_match():
+    """
+    Verifies that the verify_password function returns True when passwords match.
+    """
+    # Arrange
+    plain_password = "password1"
+    hashed_password = "password1"
+    # Act
+    result = verify_password(plain_password, hashed_password)
+    # Assert
+    assert result is True
 
-def test_create_connection_null_input():
-    """Test creating a connection with a null input."""
+def test_verify_password_mismatch():
+    """
+    Verifies that the verify_password function returns False when passwords do not match.
+    """
+    # Arrange
+    plain_password = "password1"
+    hashed_password = "password2"
+    # Act
+    result = verify_password(plain_password, hashed_password)
+    # Assert
+    assert result is False
+
+def test_verify_password_none_input():
+    """
+    Verifies that the verify_password function handles None input.
+    """
+    # Arrange
+    plain_password = None
+    hashed_password = "password1"
+    # Act and Assert
     with pytest.raises(TypeError):
-        create_connection(None)
+        verify_password(plain_password, hashed_password)
 
-def test_create_connection_empty_string():
-    """Test creating a connection with an empty string."""
-    with pytest.raises(sqlite3.OperationalError):
-        create_connection("")
+# Define test cases for the generate_jwt_token function
+def test_generate_jwt_token():
+    """
+    Verifies that the generate_jwt_token function generates a JWT token.
+    """
+    # Arrange
+    user = User(id=1, username="user1", password="password1")
+    # Act
+    token = generate_jwt_token(user)
+    # Assert
+    assert token is not None
 
-def test_validate_credentials(test_database_name, test_username, test_password):
-    """Test validating user credentials."""
-    connection = create_connection(test_database_name)
-    cursor = connection.cursor()
-    cursor.execute("CREATE TABLE IF NOT EXISTS users (username TEXT, password TEXT)")
-    cursor.execute("INSERT OR IGNORE INTO users VALUES (?, ?)", (test_username, test_password))
-    connection.commit()
-    
-    is_valid = validate_credentials(connection, test_username, test_password)
-    assert is_valid
-    
-    connection.close()
+def test_generate_jwt_token_none_input():
+    """
+    Verifies that the generate_jwt_token function handles None input.
+    """
+    # Arrange
+    user = None
+    # Act and Assert
+    with pytest.raises(AttributeError):
+        generate_jwt_token(user)
 
-def test_validate_credentials_null_input(test_database_name):
-    """Test validating user credentials with a null input."""
-    connection = create_connection(test_database_name)
-    with pytest.raises(TypeError):
-        validate_credentials(connection, None, "password")
-    connection.close()
+# Define test cases for the login endpoint
+def test_login_success():
+    """
+    Verifies that the login endpoint returns a JWT token when credentials are valid.
+    """
+    # Arrange
+    credentials = UserCredentials(username="user1", password="password1")
+    # Act
+    token = login(credentials)
+    # Assert
+    assert token is not None
+    assert "token" in token
 
-def test_validate_credentials_empty_string(test_database_name):
-    """Test validating user credentials with an empty string."""
-    connection = create_connection(test_database_name)
-    is_valid = validate_credentials(connection, "", "")
-    assert not is_valid
-    connection.close()
+def test_login_invalid_username():
+    """
+    Verifies that the login endpoint raises an exception when the username is invalid.
+    """
+    # Arrange
+    credentials = UserCredentials(username="nonexistent", password="password1")
+    # Act and Assert
+    with pytest.raises(HTTPException) as http_exc:
+        login(credentials)
+    assert http_exc.value.status_code == 401
 
-def test_login_endpoint(test_database_name, test_username, test_password):
-    """Test handling the login endpoint."""
-    result = login_endpoint(test_username, test_password, test_database_name)
-    assert isinstance(result, Dict)
-    assert 'success' in result
-    assert result['success']
+def test_login_invalid_password():
+    """
+    Verifies that the login endpoint raises an exception when the password is invalid.
+    """
+    # Arrange
+    credentials = UserCredentials(username="user1", password="wrongpassword")
+    # Act and Assert
+    with pytest.raises(HTTPException) as http_exc:
+        login(credentials)
+    assert http_exc.value.status_code == 401
 
-def test_login_endpoint_null_input():
-    """Test handling the login endpoint with a null input."""
-    with pytest.raises(TypeError):
-        login_endpoint(None, "password", "database_name")
-
-def test_login_endpoint_empty_string():
-    """Test handling the login endpoint with an empty string."""
-    result = login_endpoint("", "", "database_name")
-    assert not result['success']
-
-def test_login_endpoint_non_string_input():
-    """Test handling the login endpoint with a non-string input."""
-    with pytest.raises(TypeError):
-        login_endpoint(123, "password", "database_name")
-
-def test_login_endpoint_sql_injection(test_database_name, test_username, test_password):
-    """Test handling the login endpoint with a SQL injection attack."""
-    connection = create_connection(test_database_name)
-    cursor = connection.cursor()
-    cursor.execute("CREATE TABLE IF NOT EXISTS users (username TEXT, password TEXT)")
-    cursor.execute("INSERT OR IGNORE INTO users VALUES (?, ?)", (test_username, test_password))
-    connection.commit()
-    
-    result = login_endpoint(test_username + "' OR 1=1 --", test_password, test_database_name)
-    assert not result['success']
-
-def test_login_endpoint_database_not_found():
-    """Test handling the login endpoint with a non-existent database."""
-    with pytest.raises(sqlite3.OperationalError):
-        login_endpoint("username", "password", "non_existent_database.db")
-
-def test_login_endpoint_database_permission_denied():
-    """Test handling the login endpoint with a database that has permission denied."""
-    with pytest.raises(sqlite3.OperationalError):
-        login_endpoint("username", "password", "/root/database.db")
+def test_login_none_input():
+    """
+    Verifies that the login endpoint handles None input.
+    """
+    # Arrange
+    credentials = None
+    # Act and Assert
+    with pytest.raises(AttributeError):
+        login(credentials)
