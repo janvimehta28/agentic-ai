@@ -1,118 +1,152 @@
 # Import required libraries
 from typing import Dict, Optional
 from fastapi import FastAPI, HTTPException, Depends
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
-import jwt
+from jwt import encode, decode
 from datetime import datetime, timedelta
+from passlib.context import CryptContext
 
 # Define the FastAPI application
 app = FastAPI()
 
-# Define the security scheme for basic authentication
-security = HTTPBasic()
+# Define the OAuth2 scheme
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
-# Define a model for the user credentials
-class UserCredentials(BaseModel):
-    """Model for user credentials."""
-    username: str
-    password: str
-
-# Define a model for the user
+# Define the user model
 class User(BaseModel):
-    """Model for a user."""
-    id: int
+    """User model"""
     username: str
     password: str
 
-# In-memory database for demonstration purposes
-# In a real application, use a proper database
-users_db: Dict[int, User] = {
-    1: User(id=1, username="user1", password="password1"),
-    2: User(id=2, username="user2", password="password2"),
-}
+# Define the token model
+class Token(BaseModel):
+    """Token model"""
+    access_token: str
+    token_type: str
+
+# Define the password context
+pwd_context = CryptContext(schemes=["bcrypt"], default="bcrypt")
+
+# Define the users database (in-memory for simplicity)
+users_db: Dict[str, str] = {}
 
 def get_user(username: str) -> Optional[User]:
     """
-    Retrieves a user from the database by username.
+    Get a user from the database.
 
     Args:
-    - username (str): The username to search for.
+    - username (str): The username to retrieve.
 
     Returns:
-    - Optional[User]: The user if found, otherwise None.
+    - Optional[User]: The user if found, None otherwise.
     """
-    # Iterate over the users in the database
-    for user in users_db.values():
-        # Check if the username matches
-        if user.username == username:
-            # Return the user if found
-            return user
-    # Return None if not found
-    return None
+    # Check if the username exists in the database
+    if username in users_db:
+        # Return the user
+        return User(username=username, password=users_db[username])
+    else:
+        # Return None if the user is not found
+        return None
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
-    Verifies a plain password against a hashed password.
+    Verify a password against a hashed password.
 
     Args:
     - plain_password (str): The plain password to verify.
-    - hashed_password (str): The hashed password to compare against.
+    - hashed_password (str): The hashed password to verify against.
 
     Returns:
-    - bool: True if the passwords match, False otherwise.
+    - bool: True if the password is valid, False otherwise.
     """
-    # For demonstration purposes, assume the hashed password is the plain password
-    # In a real application, use a proper password hashing algorithm
-    return plain_password == hashed_password
+    # Use the password context to verify the password
+    return pwd_context.verify(plain_password, hashed_password)
 
-def generate_jwt_token(user: User) -> str:
+def get_password_hash(password: str) -> str:
     """
-    Generates a JWT token for a user.
+    Get the hashed password.
 
     Args:
-    - user (User): The user to generate the token for.
+    - password (str): The password to hash.
 
     Returns:
-    - str: The generated JWT token.
+    - str: The hashed password.
     """
-    # Set the token expiration time to 1 hour
-    expiration_time = datetime.utcnow() + timedelta(hours=1)
-    # Create a payload for the token
-    payload = {
-        "user_id": user.id,
-        "username": user.username,
-        "exp": int(expiration_time.timestamp())
-    }
-    # Generate the token using a secret key
-    # In a real application, use a secure secret key
-    secret_key = "secret_key"
-    token = jwt.encode(payload, secret_key, algorithm="HS256")
-    # Return the generated token
-    return token
+    # Use the password context to hash the password
+    return pwd_context.hash(password)
 
-@app.post("/login")
-def login(credentials: UserCredentials) -> Dict[str, str]:
+def create_access_token(data: Dict[str, str], expires_delta: Optional[timedelta] = None) -> str:
     """
-    Handles the login endpoint.
+    Create an access token.
 
     Args:
-    - credentials (UserCredentials): The user credentials.
+    - data (Dict[str, str]): The data to encode in the token.
+    - expires_delta (Optional[timedelta]): The expiration time delta. Defaults to None.
 
     Returns:
-    - Dict[str, str]: A dictionary containing the JWT token.
+    - str: The access token.
     """
-    # Retrieve the user from the database
-    user = get_user(credentials.username)
+    # Set the expiration time if not provided
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    
+    # Create the token payload
+    payload = data.copy()
+    payload.update({"exp": expire})
+    
+    # Encode the payload to create the token
+    return encode(payload, "secret_key", algorithm="HS256")
+
+def login(username: str, password: str) -> Optional[Token]:
+    """
+    Login a user.
+
+    Args:
+    - username (str): The username to login.
+    - password (str): The password to login with.
+
+    Returns:
+    - Optional[Token]: The token if the login is successful, None otherwise.
+    """
+    # Get the user from the database
+    user = get_user(username)
+    
     # Check if the user exists
-    if user is None:
-        # Raise an exception if the user does not exist
+    if not user:
+        # Raise an exception if the user is not found
         raise HTTPException(status_code=401, detail="Invalid username or password")
+    
     # Verify the password
-    if not verify_password(credentials.password, user.password):
-        # Raise an exception if the password is incorrect
+    if not verify_password(password, user.password):
+        # Raise an exception if the password is invalid
         raise HTTPException(status_code=401, detail="Invalid username or password")
-    # Generate a JWT token for the user
-    token = generate_jwt_token(user)
-    # Return the token in a dictionary
-    return {"token": token}
+    
+    # Create the access token
+    access_token = create_access_token(data={"sub": username})
+    
+    # Return the token
+    return Token(access_token=access_token, token_type="bearer")
+
+# Define the login endpoint
+@app.post("/login", response_model=Token)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+    """
+    Login endpoint.
+
+    Args:
+    - form_data (OAuth2PasswordRequestForm): The login form data.
+
+    Returns:
+    - Token: The access token.
+    """
+    # Login the user
+    return login(form_data.username, form_data.password)
+
+# Define a test user
+@app.on_event("startup")
+async def startup_event():
+    # Create a test user
+    users_db["test_user"] = get_password_hash("test_password")

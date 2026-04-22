@@ -1,146 +1,195 @@
-# Import required libraries
 import pytest
-from typing import Dict, Optional
-from fastapi import FastAPI, HTTPException
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.testclient import TestClient
+from main import app, get_user, verify_password, get_password_hash, create_access_token, login
 from pydantic import BaseModel
-import jwt
-from datetime import datetime, timedelta
-from your_module import get_user, verify_password, generate_jwt_token, UserCredentials, User  # noqa: E402
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from jwt import decode
 
-# Define test cases for the get_user function
-def test_get_user_found():
+# Create a test client
+client = TestClient(app)
+
+class User(BaseModel):
+    """User model"""
+    username: str
+    password: str
+
+class Token(BaseModel):
+    """Token model"""
+    access_token: str
+    token_type: str
+
+# Test the get_user function
+def test_get_user():
     """
-    Verifies that the get_user function returns a user when found.
+    Test the get_user function.
+
+    Verifies:
+    - The function returns a user if the username exists in the database.
+    - The function returns None if the username does not exist in the database.
     """
-    # Arrange
-    username = "user1"
-    # Act
-    user = get_user(username)
-    # Assert
+    # Create a test user
+    users_db = {}
+    users_db["test_user"] = "test_password"
+    
+    # Test the function with an existing user
+    user = get_user("test_user")
     assert user is not None
-    assert user.username == username
-
-def test_get_user_not_found():
-    """
-    Verifies that the get_user function returns None when not found.
-    """
-    # Arrange
-    username = "nonexistent"
-    # Act
-    user = get_user(username)
-    # Assert
+    assert user.username == "test_user"
+    assert user.password == "test_password"
+    
+    # Test the function with a non-existent user
+    user = get_user("non_existent_user")
     assert user is None
 
-def test_get_user_none_input():
+# Test the verify_password function
+def test_verify_password():
     """
-    Verifies that the get_user function handles None input.
-    """
-    # Arrange
-    username = None
-    # Act and Assert
-    with pytest.raises(AttributeError):
-        get_user(username)
+    Test the verify_password function.
 
-# Define test cases for the verify_password function
-def test_verify_password_match():
+    Verifies:
+    - The function returns True if the password is valid.
+    - The function returns False if the password is invalid.
     """
-    Verifies that the verify_password function returns True when passwords match.
-    """
-    # Arrange
-    plain_password = "password1"
-    hashed_password = "password1"
-    # Act
-    result = verify_password(plain_password, hashed_password)
-    # Assert
-    assert result is True
+    # Create a test user
+    users_db = {}
+    users_db["test_user"] = get_password_hash("test_password")
+    
+    # Test the function with a valid password
+    assert verify_password("test_password", users_db["test_user"]) is True
+    
+    # Test the function with an invalid password
+    assert verify_password("invalid_password", users_db["test_user"]) is False
 
-def test_verify_password_mismatch():
+# Test the get_password_hash function
+def test_get_password_hash():
     """
-    Verifies that the verify_password function returns False when passwords do not match.
-    """
-    # Arrange
-    plain_password = "password1"
-    hashed_password = "password2"
-    # Act
-    result = verify_password(plain_password, hashed_password)
-    # Assert
-    assert result is False
+    Test the get_password_hash function.
 
-def test_verify_password_none_input():
+    Verifies:
+    - The function returns a hashed password.
     """
-    Verifies that the verify_password function handles None input.
-    """
-    # Arrange
-    plain_password = None
-    hashed_password = "password1"
-    # Act and Assert
-    with pytest.raises(TypeError):
-        verify_password(plain_password, hashed_password)
+    # Test the function
+    hashed_password = get_password_hash("test_password")
+    assert hashed_password is not None
 
-# Define test cases for the generate_jwt_token function
-def test_generate_jwt_token():
+# Test the create_access_token function
+def test_create_access_token():
     """
-    Verifies that the generate_jwt_token function generates a JWT token.
+    Test the create_access_token function.
+
+    Verifies:
+    - The function returns an access token.
     """
-    # Arrange
-    user = User(id=1, username="user1", password="password1")
-    # Act
-    token = generate_jwt_token(user)
-    # Assert
+    # Test the function
+    access_token = create_access_token(data={"sub": "test_user"})
+    assert access_token is not None
+
+# Test the login function
+def test_login():
+    """
+    Test the login function.
+
+    Verifies:
+    - The function returns a token if the login is successful.
+    - The function raises an exception if the login is unsuccessful.
+    """
+    # Create a test user
+    users_db = {}
+    users_db["test_user"] = get_password_hash("test_password")
+    
+    # Test the function with valid credentials
+    token = login("test_user", "test_password")
     assert token is not None
+    assert token.access_token is not None
+    assert token.token_type == "bearer"
+    
+    # Test the function with invalid credentials
+    with pytest.raises(Exception):
+        login("test_user", "invalid_password")
 
-def test_generate_jwt_token_none_input():
+# Test the login endpoint
+def test_login_endpoint():
     """
-    Verifies that the generate_jwt_token function handles None input.
-    """
-    # Arrange
-    user = None
-    # Act and Assert
-    with pytest.raises(AttributeError):
-        generate_jwt_token(user)
+    Test the login endpoint.
 
-# Define test cases for the login endpoint
-def test_login_success():
+    Verifies:
+    - The endpoint returns a token if the login is successful.
+    - The endpoint raises an exception if the login is unsuccessful.
     """
-    Verifies that the login endpoint returns a JWT token when credentials are valid.
-    """
-    # Arrange
-    credentials = UserCredentials(username="user1", password="password1")
-    # Act
-    token = login(credentials)
-    # Assert
-    assert token is not None
-    assert "token" in token
+    # Create a test user
+    users_db = {}
+    users_db["test_user"] = get_password_hash("test_password")
+    
+    # Test the endpoint with valid credentials
+    response = client.post("/login", data={"username": "test_user", "password": "test_password"})
+    assert response.status_code == 200
+    assert response.json()["access_token"] is not None
+    assert response.json()["token_type"] == "bearer"
+    
+    # Test the endpoint with invalid credentials
+    response = client.post("/login", data={"username": "test_user", "password": "invalid_password"})
+    assert response.status_code == 401
 
-def test_login_invalid_username():
+# Test the login endpoint with None inputs
+def test_login_endpoint_none_inputs():
     """
-    Verifies that the login endpoint raises an exception when the username is invalid.
-    """
-    # Arrange
-    credentials = UserCredentials(username="nonexistent", password="password1")
-    # Act and Assert
-    with pytest.raises(HTTPException) as http_exc:
-        login(credentials)
-    assert http_exc.value.status_code == 401
+    Test the login endpoint with None inputs.
 
-def test_login_invalid_password():
+    Verifies:
+    - The endpoint raises an exception if the username or password is None.
     """
-    Verifies that the login endpoint raises an exception when the password is invalid.
-    """
-    # Arrange
-    credentials = UserCredentials(username="user1", password="wrongpassword")
-    # Act and Assert
-    with pytest.raises(HTTPException) as http_exc:
-        login(credentials)
-    assert http_exc.value.status_code == 401
+    # Test the endpoint with None username
+    response = client.post("/login", data={"username": None, "password": "test_password"})
+    assert response.status_code == 422
+    
+    # Test the endpoint with None password
+    response = client.post("/login", data={"username": "test_user", "password": None})
+    assert response.status_code == 422
 
-def test_login_none_input():
+# Test the login endpoint with empty strings
+def test_login_endpoint_empty_strings():
     """
-    Verifies that the login endpoint handles None input.
+    Test the login endpoint with empty strings.
+
+    Verifies:
+    - The endpoint raises an exception if the username or password is an empty string.
     """
-    # Arrange
-    credentials = None
-    # Act and Assert
-    with pytest.raises(AttributeError):
-        login(credentials)
+    # Test the endpoint with empty username
+    response = client.post("/login", data={"username": "", "password": "test_password"})
+    assert response.status_code == 401
+    
+    # Test the endpoint with empty password
+    response = client.post("/login", data={"username": "test_user", "password": ""})
+    assert response.status_code == 401
+
+# Test the login endpoint with boundary values
+def test_login_endpoint_boundary_values():
+    """
+    Test the login endpoint with boundary values.
+
+    Verifies:
+    - The endpoint raises an exception if the username or password exceeds the maximum length.
+    """
+    # Test the endpoint with long username
+    response = client.post("/login", data={"username": "a" * 1000, "password": "test_password"})
+    assert response.status_code == 422
+    
+    # Test the endpoint with long password
+    response = client.post("/login", data={"username": "test_user", "password": "a" * 1000})
+    assert response.status_code == 422
+
+# Test the login endpoint with type errors
+def test_login_endpoint_type_errors():
+    """
+    Test the login endpoint with type errors.
+
+    Verifies:
+    - The endpoint raises an exception if the username or password is not a string.
+    """
+    # Test the endpoint with non-string username
+    response = client.post("/login", data={"username": 123, "password": "test_password"})
+    assert response.status_code == 422
+    
+    # Test the endpoint with non-string password
+    response = client.post("/login", data={"username": "test_user", "password": 123})
+    assert response.status_code == 422

@@ -14,7 +14,7 @@ load_dotenv()
 
 LOGGER = logging.getLogger(__name__)
 
-GROQ_API_KEY_ENV = "GROQ_API_KEY"
+GROQ_API_KEY_ENV = "GROQ_API_KEY_TESTER"
 GROQ_MODEL = "groq/llama-3.3-70b-versatile"
 
 TESTER_ROLE = "QA Engineer"
