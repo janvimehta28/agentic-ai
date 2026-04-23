@@ -1,15 +1,16 @@
+ 
 {
   "total_findings": 1,
-  "high_count": 0,
+  "high_count": 1,
   "medium_count": 0,
-  "low_count": 1,
+  "low_count": 0,
   "findings": [
     {
-      "severity": "LOW",
-      "title": "Missing Input Validation",
-      "description": "The function sum_numbers does not validate its input. It assumes that the input will always be a list of numbers, but it does not check for this. If the input is not a list, or if the list contains non-numeric values, the function will throw an error.",
-      "line_number": null,
-      "suggested_fix": "Add input validation to check that the input is a list of numbers. For example: if not isinstance(numbers, list) or not all(isinstance(num, (int, float)) for num in numbers): raise ValueError('Input must be a list of numbers')"
+      "severity": "HIGH",
+      "title": "Insecure use of eval()",
+      "description": "The eval() function is used to evaluate the expression in the entry field. This can lead to code injection attacks if the input is not properly sanitized.",
+      "line_number": 43,
+      "suggested_fix": "Use a safer method to evaluate the expression, such as using a parsing library or writing a custom parser."
     }
   ]
 }

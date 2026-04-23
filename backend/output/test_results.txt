@@ -1,41 +1,43 @@
 ============================= test session starts =============================
 platform win32 -- Python 3.11.9, pytest-9.0.3, pluggy-1.6.0 -- C:\Users\dell\AppData\Local\Programs\Python\Python311\python.exe
 cachedir: .pytest_cache
-rootdir: C:\Projects\Ai Agents\agentic-ai
+rootdir: C:\Users\dell\agentic-ai
 configfile: pyproject.toml
 plugins: anyio-4.13.0, langsmith-0.7.33, cov-7.1.0
-collecting ... collected 9 items
+collecting ... collected 8 items
 
-output\test_suite.py::test_sum_numbers_happy_path_int PASSED             [ 11%]
-output\test_suite.py::test_sum_numbers_happy_path_float PASSED           [ 22%]
-output\test_suite.py::test_sum_numbers_empty_list PASSED                 [ 33%]
-output\test_suite.py::test_sum_numbers_none_input FAILED                 [ 44%]
-output\test_suite.py::test_sum_numbers_non_numeric_input PASSED          [ 55%]
-output\test_suite.py::test_sum_numbers_mixed_types PASSED                [ 66%]
-output\test_suite.py::test_sum_numbers_large_numbers PASSED              [ 77%]
-output\test_suite.py::test_sum_numbers_negative_numbers PASSED           [ 88%]
-output\test_suite.py::test_sum_numbers_float_precision PASSED            [100%]
+output\test_suite.py::test_calculator_init PASSED                        [ 12%]
+output\test_suite.py::test_create_buttons PASSED                         [ 25%]
+output\test_suite.py::test_click_button_number PASSED                    [ 37%]
+output\test_suite.py::test_click_button_operator PASSED                  [ 50%]
+output\test_suite.py::test_click_button_equals PASSED                    [ 62%]
+output\test_suite.py::test_click_button_equals_error PASSED              [ 75%]
+output\test_suite.py::test_clear_entry PASSED                            [ 87%]
+output\test_suite.py::test_delete_char FAILED                            [100%]
 
 ================================== FAILURES ===================================
-_________________________ test_sum_numbers_none_input _________________________
+______________________________ test_delete_char _______________________________
 
-    def test_sum_numbers_none_input() -> None:
+    def test_delete_char() -> None:
         """
-        Test sum_numbers with None input.
+        Tests the delete_char method.
         """
->       with pytest.raises(TypeError):
-E       Failed: DID NOT RAISE <class 'TypeError'>
+        root = tk.Tk()
+        calc = Calculator(root)
+        calc.entry.insert(0, '5+5')
+>       calc.delete
+E       AttributeError: 'Calculator' object has no attribute 'delete'
 
-output\test_suite.py:47: Failed
+output\test_suite.py:158: AttributeError
 =============================== tests coverage ================================
 _______________ coverage: platform win32, python 3.11.9-final-0 _______________
 
 Name                       Stmts   Miss  Cover
 ----------------------------------------------
-output\generated_code.py      10     10     0%
-output\test_suite.py          28      0   100%
+output\generated_code.py      42     42     0%
+output\test_suite.py          81      3    96%
 ----------------------------------------------
-TOTAL                         38     10    74%
+TOTAL                        123     45    63%
 =========================== short test summary info ===========================
-FAILED output\test_suite.py::test_sum_numbers_none_input - Failed: DID NOT RA...
-========================= 1 failed, 8 passed in 0.79s =========================
+FAILED output\test_suite.py::test_delete_char - AttributeError: 'Calculator' ...
+========================= 1 failed, 7 passed in 3.28s =========================

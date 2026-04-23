@@ -1,96 +1,159 @@
 # AutonomousDev Report
 
 ## Generated Code
-def sum_numbers(numbers: list[int | float]) -> int | float:
-    """
-    Calculate the sum of a list of numbers.
+import tkinter as tk
+from tkinter import messagebox
 
-    Args:
-        numbers: A list of integers or floats.
-
-    Returns:
-        The sum of the numbers in the list.
+class Calculator:
     """
-    # Initialize sum to 0
-    total = 0
-    # Check if the list is not empty
-    if numbers:
-        # Iterate over each number in the list
-        for num in numbers:
-            # Add the number to the total
-            total += num
-    # Return the total sum
-    return total
+    A simple calculator using tkinter module.
+    """
+
+    def __init__(self, master: tk.Tk) -> None:
+        """
+        Initializes the calculator.
+
+        Args:
+            master (tk.Tk): The main window.
+        """
+        self.master = master
+        self.entry = tk.Entry(master, width=35, borderwidth=5)
+        self.entry.grid(row=0, column=0, columnspan=4)
+        self.create_buttons()
+
+    def create_buttons(self) -> None:
+        """
+        Creates the buttons for the calculator.
+        """
+        buttons = [
+            '7', '8', '9', '/',
+            '4', '5', '6', '*',
+            '1', '2', '3', '-',
+            '0', '.', '=', '+'
+        ]
+
+        row_val = 1
+        col_val = 0
+
+        for button in buttons:
+            # Create a button and add it to the grid
+            tk.Button(self.master, text=button, width=10, command=lambda button=button: self.click_button(button)).grid(row=row_val, column=col_val)
+            col_val += 1
+            if col_val > 3:
+                col_val = 0
+                row_val += 1
+
+        # Create a clear button
+        tk.Button(self.master, text="Clear", width=22, command=self.clear_entry).grid(row=row_val, column=0, columnspan=2)
+        tk.Button(self.master, text="Delete", width=22, command=self.delete_char).grid(row=row_val, column=2, columnspan=2)
+
+    def click_button(self, button: str) -> None:
+        """
+        Handles a button click.
+
+        Args:
+            button (str): The text of the button.
+        """
+        # Check if the button is a number or operator
+        if button == '=':
+            try:
+                # Evaluate the expression in the entry field
+                result = str(eval(self.entry.get()))
+                self.entry.delete(0, tk.END)
+                self.entry.insert(tk.END, result)
+            except Exception as e:
+                # Handle any exceptions
+                messagebox.showerror("Error", str(e))
+        else:
+            # Append the button text to the entry field
+            self.entry.insert(tk.END, button)
+
+    def clear_entry(self) -> None:
+        """
+        Clears the entry field.
+        """
+        self.entry.delete(0, tk.END)
+
+    def delete_char(self) -> None:
+        """
+        Deletes the last character in the entry field.
+        """
+        current = self.entry.get()
+        self.entry.delete(0, tk.END)
+        self.entry.insert(0, current[:-1])
 
 def main() -> None:
     """
-    Test the sum_numbers function.
+    Creates and starts the calculator.
     """
-    # Test with a list of integers
-    print(sum_numbers([1, 2, 3, 4, 5]))  # Expected output: 15
-    # Test with a list of floats
-    print(sum_numbers([1.5, 2.5, 3.5, 4.5, 5.5]))  # Expected output: 17.5
-    # Test with an empty list
-    print(sum_numbers([]))  # Expected output: 0
+    root = tk.Tk()
+    root.title("Calculator")
+    calc = Calculator(root)
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()
 
 ## Test Results
 - Status: FAILED
-- Coverage: TOTAL                         38     10    74%
+- Coverage: TOTAL                        123     45    63%
 
 ### Full Test Output
 ============================= test session starts =============================
 platform win32 -- Python 3.11.9, pytest-9.0.3, pluggy-1.6.0 -- C:\Users\dell\AppData\Local\Programs\Python\Python311\python.exe
 cachedir: .pytest_cache
-rootdir: C:\Projects\Ai Agents\agentic-ai
+rootdir: C:\Users\dell\agentic-ai
 configfile: pyproject.toml
 plugins: anyio-4.13.0, langsmith-0.7.33, cov-7.1.0
-collecting ... collected 9 items
+collecting ... collected 8 items
 
-output\test_suite.py::test_sum_numbers_happy_path_int PASSED             [ 11%]
-output\test_suite.py::test_sum_numbers_happy_path_float PASSED           [ 22%]
-output\test_suite.py::test_sum_numbers_empty_list PASSED                 [ 33%]
-output\test_suite.py::test_sum_numbers_none_input FAILED                 [ 44%]
-output\test_suite.py::test_sum_numbers_non_numeric_input PASSED          [ 55%]
-output\test_suite.py::test_sum_numbers_mixed_types PASSED                [ 66%]
-output\test_suite.py::test_sum_numbers_large_numbers PASSED              [ 77%]
-output\test_suite.py::test_sum_numbers_negative_numbers PASSED           [ 88%]
-output\test_suite.py::test_sum_numbers_float_precision PASSED            [100%]
+output\test_suite.py::test_calculator_init PASSED                        [ 12%]
+output\test_suite.py::test_create_buttons PASSED                         [ 25%]
+output\test_suite.py::test_click_button_number PASSED                    [ 37%]
+output\test_suite.py::test_click_button_operator PASSED                  [ 50%]
+output\test_suite.py::test_click_button_equals PASSED                    [ 62%]
+output\test_suite.py::test_click_button_equals_error PASSED              [ 75%]
+output\test_suite.py::test_clear_entry PASSED                            [ 87%]
+output\test_suite.py::test_delete_char FAILED                            [100%]
 
 ================================== FAILURES ===================================
-_________________________ test_sum_numbers_none_input _________________________
+______________________________ test_delete_char _______________________________
 
-    def test_sum_numbers_none_input() -> None:
+    def test_delete_char() -> None:
         """
-        Test sum_numbers with None input.
+        Tests the delete_char method.
         """
->       with pytest.raises(TypeError):
-E       Failed: DID NOT RAISE <class 'TypeError'>
+        root = tk.Tk()
+        calc = Calculator(root)
+        calc.entry.insert(0, '5+5')
+>       calc.delete
+E       AttributeError: 'Calculator' object has no attribute 'delete'
 
-output\test_suite.py:47: Failed
+output\test_suite.py:158: AttributeError
 =============================== tests coverage ================================
 _______________ coverage: platform win32, python 3.11.9-final-0 _______________
 
 Name                       Stmts   Miss  Cover
 ----------------------------------------------
-output\generated_code.py      10     10     0%
-output\test_suite.py          28      0   100%
+output\generated_code.py      42     42     0%
+output\test_suite.py          81      3    96%
 ----------------------------------------------
-TOTAL                         38     10    74%
+TOTAL                        123     45    63%
 =========================== short test summary info ===========================
-FAILED output\test_suite.py::test_sum_numbers_none_input - Failed: DID NOT RA...
-========================= 1 failed, 8 passed in 0.79s =========================
+FAILED output\test_suite.py::test_delete_char - AttributeError: 'Calculator' ...
+========================= 1 failed, 7 passed in 3.28s =========================
 
 ## Vulnerability Report
 Total findings: 1
 
 
-### [LOW] Missing Input Validation
+### [HIGH] Insecure use of eval()
 
-**Description:** The function sum_numbers does not validate its input. It assumes that the input will always be a list of numbers, but it does not check for this. If the input is not a list, or if the list contains non-numeric values, the function will throw an error.
+**Description:** The eval() function is used to evaluate the expression in the entry field. This can lead to code injection attacks if the input is not properly sanitized.
 
 
 
-**Suggested Fix:** Add input validation to check that the input is a list of numbers. For example: if not isinstance(numbers, list) or not all(isinstance(num, (int, float)) for num in numbers): raise ValueError('Input must be a list of numbers')
+**Suggested Fix:** Use a safer method to evaluate the expression, such as using a parsing library or writing a custom parser.
 
 ---
 

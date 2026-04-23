@@ -81,6 +81,7 @@ export default function Home() {
   const [pipelineStatus, setPipelineStatus] = useState<
     "idle" | "running" | "complete" | "error"
   >("idle");
+  const [jobId, setJobId] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [ticketInput, setTicketInput] = useState("");
   const [startTime, setStartTime] = useState<number | null>(null);
@@ -154,95 +155,99 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  // Poll for results while running
+  // SSE log streaming and result handling
   useEffect(() => {
-    if (pipelineStatus !== "running") return;
-
-    const pollResults = async () => {
-      try {
-        const response = await fetch(`${API_URL}/results`);
-        if (!response.ok) return;
-
-        const data = await response.json();
-
-        // Update writer output
-        if (data.writer) {
-          setWriterOutput({
-            code: data.writer.code || null,
-            status: data.writer.status || "running",
-          });
-        }
-
-        // Update tester output
-        if (data.tester) {
-          setTesterOutput({
-            totalTests: data.tester.totalTests || 0,
-            passed: data.tester.passed || 0,
-            failed: data.tester.failed || 0,
-            coveragePercent: data.tester.coverage || 0,
-            testResults: data.tester.testResults || [],
-            status: data.tester.status || "running",
-          });
-        }
-
-        // Update red team output
-        if (data.redteam) {
-          setRedTeamOutput({
-            findings: data.redteam.findings || [],
-            counts: data.redteam.counts || { high: 0, medium: 0, low: 0 },
-            status: data.redteam.status || "running",
-          });
-        }
-
-        // Check if all complete
-        const allComplete =
-          data.writer?.status === "complete" &&
-          data.tester?.status === "complete" &&
-          data.redteam?.status === "complete";
-
-        const hasError =
-          data.writer?.status === "error" ||
-          data.tester?.status === "error" ||
-          data.redteam?.status === "error";
-
-        if (allComplete) {
-          setPipelineStatus("complete");
-          addLog("SYSTEM", "Pipeline completed successfully", "success");
-        } else if (hasError) {
-          setPipelineStatus("error");
-          addLog("SYSTEM", "Pipeline encountered an error", "error");
-        }
-      } catch {
-        // Silent fail for polling
-      }
-    };
-
-    const interval = setInterval(pollResults, 2000);
-    return () => clearInterval(interval);
-  }, [pipelineStatus, addLog]);
-
-  // SSE log streaming
-  useEffect(() => {
-    if (pipelineStatus !== "running") return;
+    if (pipelineStatus !== "running" || !jobId) return;
 
     let eventSource: EventSource | null = null;
 
     try {
-      eventSource = new EventSource(`${API_URL}/stream-logs`);
+      eventSource = new EventSource(`${API_URL}/status/${jobId}`);
 
       eventSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          setLogs((prev) => [
-            ...prev,
-            {
-              timestamp: data.timestamp || getTimestamp(),
-              agent: data.agent,
-              message: data.message,
-              level: data.level || "info",
-            },
-          ]);
-        } catch {
+          
+          if (data.type === "log") {
+            // Try to infer agent from message content for better UI
+            let inferredAgent: AgentType = "SYSTEM";
+            const msg = data.message.toLowerCase();
+            if (msg.includes("writer") || msg.includes("code")) inferredAgent = "WRITER";
+            else if (msg.includes("test") || msg.includes("pytest")) inferredAgent = "TESTER";
+            else if (msg.includes("red team") || msg.includes("vulnerabilit")) inferredAgent = "RED TEAM";
+
+            setLogs((prev) => [
+              ...prev,
+              {
+                timestamp: getTimestamp(),
+                agent: inferredAgent,
+                message: data.message,
+                level: "info",
+              },
+            ]);
+            
+            // Update agent active statuses heuristically based on logs
+            if (inferredAgent === "WRITER" && writerOutput.status === "idle") {
+               setWriterOutput(prev => ({ ...prev, status: "active" }));
+            } else if (inferredAgent === "TESTER" && testerOutput.status === "idle") {
+               setWriterOutput(prev => ({ ...prev, status: "complete" }));
+               setTesterOutput(prev => ({ ...prev, status: "active" }));
+            } else if (inferredAgent === "RED TEAM" && redTeamOutput.status === "idle") {
+               setRedTeamOutput(prev => ({ ...prev, status: "active" }));
+            }
+          } else if (data.type === "done") {
+            const result = data.result;
+            
+            // Writer output
+            setWriterOutput({ code: result.code || null, status: "complete" });
+            
+            // Tester output
+            const testOutput = result.test_results?.output || "";
+            const passedMatch = testOutput.match(/(\d+)\s+passed/);
+            const failedMatch = testOutput.match(/(\d+)\s+failed/);
+            const passed = passedMatch ? parseInt(passedMatch[1], 10) : 0;
+            const failed = failedMatch ? parseInt(failedMatch[1], 10) : 0;
+            let totalTests = passed + failed;
+            if (totalTests === 0 && testOutput.includes("passed")) totalTests = 1; // Fallback
+            
+            // Parse coverage
+            const covText = result.test_results?.coverage || "";
+            const covMatch = covText.match(/(\d+)%/);
+            const coveragePercent = covMatch ? parseInt(covMatch[1], 10) : 0;
+
+            setTesterOutput({
+              totalTests,
+              passed,
+              failed,
+              coveragePercent,
+              testResults: testOutput ? [{ name: "Pytest Execution", status: result.test_results?.passed ? "passed" : "failed", error: testOutput.split('\n').slice(-5).join('\n') }] : [],
+              status: "complete"
+            });
+            
+            // Red Team output
+            const findings = result.vulnerabilities || [];
+            let high = 0, medium = 0, low = 0;
+            findings.forEach((f: any) => {
+              if (f.severity === "HIGH") high++;
+              else if (f.severity === "MEDIUM") medium++;
+              else if (f.severity === "LOW") low++;
+            });
+            
+            setRedTeamOutput({
+              findings,
+              counts: { high, medium, low },
+              status: "complete"
+            });
+            
+            setPipelineStatus("complete");
+            addLog("SYSTEM", "Pipeline completed successfully", "success");
+            eventSource?.close();
+          } else if (data.type === "error") {
+            setPipelineStatus("error");
+            addLog("SYSTEM", `Pipeline error: ${data.message}`, "error");
+            eventSource?.close();
+          }
+        } catch (err) {
           // Invalid JSON, ignore
         }
       };
@@ -257,7 +262,7 @@ export default function Home() {
     return () => {
       eventSource?.close();
     };
-  }, [pipelineStatus]);
+  }, [pipelineStatus, jobId, addLog, writerOutput.status, testerOutput.status, redTeamOutput.status]);
 
   // Run pipeline
   const handleRunPipeline = async () => {
@@ -296,6 +301,11 @@ export default function Home() {
 
       if (!response.ok) {
         throw new Error("Failed to start pipeline");
+      }
+
+      const responseData = await response.json();
+      if (responseData.job_id) {
+        setJobId(responseData.job_id);
       }
 
       addLog("WRITER", "Writer Agent initialized", "info");
