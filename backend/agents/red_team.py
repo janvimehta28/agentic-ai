@@ -22,22 +22,16 @@ GROQ_MODEL = "groq/llama-3.3-70b-versatile"
 
 RED_TEAM_ROLE = "Security Reviewer"
 RED_TEAM_GOAL = (
-    "Analyze the provided Python code like an attacker would. Find every security vulnerability, "
-    "logic flaw, injection risk, and dangerous pattern. Assume all code is insecure until proven "
-    "otherwise. Return a structured report with severity ratings and concrete fix suggestions for "
-    "every finding."
+    "Analyze the provided Python code for security vulnerabilities, logic flaws, and dangerous patterns. "
+    "Return a structured report with severity ratings and fix suggestions for every finding."
 )
 RED_TEAM_BACKSTORY = (
-    "You are a senior security engineer and penetration tester with 15 years of experience "
-    "breaking production systems. You think like an attacker, not a defender. You never give code "
-    "the benefit of the doubt. You have found critical vulnerabilities in Fortune 500 companies. "
-    "You know every OWASP Top 10 vulnerability by heart. You always find at least one issue "
-    "because perfect code does not exist. You rate findings ruthlessly — if it could cause data "
-    "loss or unauthorized access it is HIGH, period."
+    "Senior pentester. Think like an attacker — never give code the benefit of the doubt. "
+    "Know OWASP Top 10 cold. Rate ruthlessly: data loss or unauthorized access = HIGH."
 )
 
 _LLM_TEMPERATURE = 0.1
-_LLM_MAX_TOKENS = 4096
+_LLM_MAX_TOKENS = 1024
 
 
 def _get_groq_api_key() -> str:
@@ -74,6 +68,6 @@ red_team = Agent(
     tools=[bandit_tool],
     verbose=True,
     allow_delegation=False,
-    max_iter=5,
+    max_iter=2,
 )
 

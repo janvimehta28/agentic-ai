@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from typing import Any
 
 from crewai import Crew, Process
 
+from agents.red_team import red_team
 from agents.tester import tester
 from agents.writer import writer
+from tasks.red_team_task import get_red_team_task
 from tasks.test_code_task import test_code_task
 from tasks.write_code_task import write_code_task
 
@@ -98,6 +101,26 @@ def run_pipeline(ticket: str) -> dict[str, Any]:
     test_suite = _strip_markdown_fences(_extract_output_text(tester_result))
     _write_file(TEST_SUITE_FILE_PATH, test_suite)
 
+    red_team_task = get_red_team_task(write_code_task)
+    red_team_crew = Crew(
+        agents=[red_team],
+        tasks=[red_team_task],
+        process=Process.sequential,
+        verbose=True,
+    )
+    _ = red_team_crew.kickoff()
+
+    vuln_findings = []
+    vuln_report_path = os.path.join(OUTPUT_DIRECTORY, "vuln_report.json")
+    if os.path.exists(vuln_report_path):
+        try:
+            with open(vuln_report_path, "r", encoding="utf-8") as file_handle:
+                vuln_data = json.load(file_handle)
+                if isinstance(vuln_data, dict):
+                    vuln_findings = vuln_data.get("findings", [])
+        except Exception:
+            pass
+
     pytest_result = subprocess.run(
         PYTEST_COMMAND,
         cwd=BACKEND_DIRECTORY,
@@ -116,4 +139,5 @@ def run_pipeline(ticket: str) -> dict[str, Any]:
             "output": combined_output,
             "coverage": _extract_coverage_text(combined_output),
         },
+        "vulnerabilities": vuln_findings,
     }

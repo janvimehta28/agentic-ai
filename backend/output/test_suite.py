@@ -1,195 +1,79 @@
 import pytest
-from fastapi.testclient import TestClient
-from main import app, get_user, verify_password, get_password_hash, create_access_token, login
-from pydantic import BaseModel
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from jwt import decode
+from typing import Union, List
 
-# Create a test client
-client = TestClient(app)
-
-class User(BaseModel):
-    """User model"""
-    username: str
-    password: str
-
-class Token(BaseModel):
-    """Token model"""
-    access_token: str
-    token_type: str
-
-# Test the get_user function
-def test_get_user():
+def sum_numbers(numbers: List[Union[int, float]]) -> Union[int, float]:
     """
-    Test the get_user function.
+    Calculate the sum of a list of numbers.
 
-    Verifies:
-    - The function returns a user if the username exists in the database.
-    - The function returns None if the username does not exist in the database.
-    """
-    # Create a test user
-    users_db = {}
-    users_db["test_user"] = "test_password"
-    
-    # Test the function with an existing user
-    user = get_user("test_user")
-    assert user is not None
-    assert user.username == "test_user"
-    assert user.password == "test_password"
-    
-    # Test the function with a non-existent user
-    user = get_user("non_existent_user")
-    assert user is None
+    Args:
+        numbers: A list of integers or floats.
 
-# Test the verify_password function
-def test_verify_password():
+    Returns:
+        The sum of the numbers in the list.
     """
-    Test the verify_password function.
+    # Initialize sum to 0
+    total = 0
+    # Check if the list is not empty
+    if numbers:
+        # Iterate over each number in the list
+        for num in numbers:
+            # Add the number to the total
+            total += num
+    # Return the total sum
+    return total
 
-    Verifies:
-    - The function returns True if the password is valid.
-    - The function returns False if the password is invalid.
+def test_sum_numbers_happy_path_int() -> None:
     """
-    # Create a test user
-    users_db = {}
-    users_db["test_user"] = get_password_hash("test_password")
-    
-    # Test the function with a valid password
-    assert verify_password("test_password", users_db["test_user"]) is True
-    
-    # Test the function with an invalid password
-    assert verify_password("invalid_password", users_db["test_user"]) is False
+    Test sum_numbers with a list of integers.
+    """
+    assert sum_numbers([1, 2, 3, 4, 5]) == 15
 
-# Test the get_password_hash function
-def test_get_password_hash():
+def test_sum_numbers_happy_path_float() -> None:
     """
-    Test the get_password_hash function.
+    Test sum_numbers with a list of floats.
+    """
+    assert sum_numbers([1.5, 2.5, 3.5, 4.5, 5.5]) == 17.5
 
-    Verifies:
-    - The function returns a hashed password.
+def test_sum_numbers_empty_list() -> None:
     """
-    # Test the function
-    hashed_password = get_password_hash("test_password")
-    assert hashed_password is not None
+    Test sum_numbers with an empty list.
+    """
+    assert sum_numbers([]) == 0
 
-# Test the create_access_token function
-def test_create_access_token():
+def test_sum_numbers_none_input() -> None:
     """
-    Test the create_access_token function.
+    Test sum_numbers with None input.
+    """
+    with pytest.raises(TypeError):
+        sum_numbers(None)
 
-    Verifies:
-    - The function returns an access token.
+def test_sum_numbers_non_numeric_input() -> None:
     """
-    # Test the function
-    access_token = create_access_token(data={"sub": "test_user"})
-    assert access_token is not None
+    Test sum_numbers with non-numeric input.
+    """
+    with pytest.raises(TypeError):
+        sum_numbers([1, 'a', 3, 4, 5])
 
-# Test the login function
-def test_login():
+def test_sum_numbers_mixed_types() -> None:
     """
-    Test the login function.
+    Test sum_numbers with mixed types.
+    """
+    assert sum_numbers([1, 2.5, 3, 4.5, 5]) == 16
 
-    Verifies:
-    - The function returns a token if the login is successful.
-    - The function raises an exception if the login is unsuccessful.
+def test_sum_numbers_large_numbers() -> None:
     """
-    # Create a test user
-    users_db = {}
-    users_db["test_user"] = get_password_hash("test_password")
-    
-    # Test the function with valid credentials
-    token = login("test_user", "test_password")
-    assert token is not None
-    assert token.access_token is not None
-    assert token.token_type == "bearer"
-    
-    # Test the function with invalid credentials
-    with pytest.raises(Exception):
-        login("test_user", "invalid_password")
+    Test sum_numbers with large numbers.
+    """
+    assert sum_numbers([1000000, 2000000, 3000000, 4000000, 5000000]) == 15000000
 
-# Test the login endpoint
-def test_login_endpoint():
+def test_sum_numbers_negative_numbers() -> None:
     """
-    Test the login endpoint.
+    Test sum_numbers with negative numbers.
+    """
+    assert sum_numbers([-1, -2, -3, -4, -5]) == -15
 
-    Verifies:
-    - The endpoint returns a token if the login is successful.
-    - The endpoint raises an exception if the login is unsuccessful.
+def test_sum_numbers_float_precision() -> None:
     """
-    # Create a test user
-    users_db = {}
-    users_db["test_user"] = get_password_hash("test_password")
-    
-    # Test the endpoint with valid credentials
-    response = client.post("/login", data={"username": "test_user", "password": "test_password"})
-    assert response.status_code == 200
-    assert response.json()["access_token"] is not None
-    assert response.json()["token_type"] == "bearer"
-    
-    # Test the endpoint with invalid credentials
-    response = client.post("/login", data={"username": "test_user", "password": "invalid_password"})
-    assert response.status_code == 401
-
-# Test the login endpoint with None inputs
-def test_login_endpoint_none_inputs():
+    Test sum_numbers with float precision.
     """
-    Test the login endpoint with None inputs.
-
-    Verifies:
-    - The endpoint raises an exception if the username or password is None.
-    """
-    # Test the endpoint with None username
-    response = client.post("/login", data={"username": None, "password": "test_password"})
-    assert response.status_code == 422
-    
-    # Test the endpoint with None password
-    response = client.post("/login", data={"username": "test_user", "password": None})
-    assert response.status_code == 422
-
-# Test the login endpoint with empty strings
-def test_login_endpoint_empty_strings():
-    """
-    Test the login endpoint with empty strings.
-
-    Verifies:
-    - The endpoint raises an exception if the username or password is an empty string.
-    """
-    # Test the endpoint with empty username
-    response = client.post("/login", data={"username": "", "password": "test_password"})
-    assert response.status_code == 401
-    
-    # Test the endpoint with empty password
-    response = client.post("/login", data={"username": "test_user", "password": ""})
-    assert response.status_code == 401
-
-# Test the login endpoint with boundary values
-def test_login_endpoint_boundary_values():
-    """
-    Test the login endpoint with boundary values.
-
-    Verifies:
-    - The endpoint raises an exception if the username or password exceeds the maximum length.
-    """
-    # Test the endpoint with long username
-    response = client.post("/login", data={"username": "a" * 1000, "password": "test_password"})
-    assert response.status_code == 422
-    
-    # Test the endpoint with long password
-    response = client.post("/login", data={"username": "test_user", "password": "a" * 1000})
-    assert response.status_code == 422
-
-# Test the login endpoint with type errors
-def test_login_endpoint_type_errors():
-    """
-    Test the login endpoint with type errors.
-
-    Verifies:
-    - The endpoint raises an exception if the username or password is not a string.
-    """
-    # Test the endpoint with non-string username
-    response = client.post("/login", data={"username": 123, "password": "test_password"})
-    assert response.status_code == 422
-    
-    # Test the endpoint with non-string password
-    response = client.post("/login", data={"username": "test_user", "password": 123})
-    assert response.status_code == 422
+    assert sum_numbers([0.1, 0.2, 0.3, 0.4, 0.5]) == 1.5
