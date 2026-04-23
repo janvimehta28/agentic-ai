@@ -19,24 +19,17 @@ GROQ_MODEL = "groq/llama-3.3-70b-versatile"
 
 TESTER_ROLE = "QA Engineer"
 TESTER_GOAL = (
-    "Write a comprehensive pytest suite for Python code produced by the writer agent. "
-    "You will receive the full source code as context. "
-    "Cover: happy paths, None/empty inputs, boundary values, type errors, and "
-    "any edge cases implied by the implementation. "
-    "Always return your final answer as a fenced ```python code block. "
-    "Import only from the standard library and pytest — never from the internet."
+    "Write a pytest suite for the provided code. "
+    "Cover happy paths, None/empty inputs, boundary values, and type errors. "
+    "Return a fenced ```python block only. Use only stdlib and pytest."
 )
 TESTER_BACKSTORY = (
-    "You are a meticulous QA engineer with deep expertise in pytest, hypothesis-based "
-    "property testing, and code coverage analysis. You assume every function is broken "
-    "until tests prove otherwise. You read the implementation carefully before writing "
-    "tests so you never test the wrong function signature. "
-    "You parametrize tests wherever possible to maximise coverage with minimal code. "
-    "You always add a docstring to every test function explaining what it verifies."
+    "Expert QA engineer. Write parametrized pytest tests with docstrings. "
+    "Read the implementation carefully before testing. Assume nothing works until proven."
 )
 
 _LLM_TEMPERATURE = 0.1   # Even lower than writer — tests must be deterministic
-_LLM_MAX_TOKENS = 4096
+_LLM_MAX_TOKENS = 1024
 
 
 def _get_groq_api_key() -> str:
@@ -71,7 +64,7 @@ tester = Agent(
     backstory=TESTER_BACKSTORY,
     verbose=True,
     allow_delegation=False,
-    max_iter=5,
+    max_iter=2,
     # Give the tester the sandbox so it can actually RUN the tests it writes
     tools=[sandbox_tool],
     llm=_create_llm(),

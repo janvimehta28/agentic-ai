@@ -16,7 +16,12 @@ from __future__ import annotations
 import logging
 import os
 import sys
+import io
 from typing import Any
+
+if sys.stdout.encoding.lower() != 'utf-8':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 from crewai import Crew, Process, Task
 
